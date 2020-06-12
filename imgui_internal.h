@@ -804,8 +804,8 @@ struct IMGUI_API ImDrawListSharedData
     ImU8            CircleSegmentCounts[64];    // Precomputed segment count for given radius before we calculate it dynamically (to avoid calculation overhead)
     const ImVec4*   TexUvLines;                 // UV of anti-aliased lines in the atlas
 
-    int             ShadowRectId;               // ID of rect for shadow texture
-    const ImVec4*   ShadowRectUvs;              // UV coordinates for shadow texture (9 entries)
+    int*            ShadowRectIds;              // IDs of rects for shadow texture (2 entries)
+    const ImVec4*   ShadowRectUvs;              // UV coordinates for shadow texture (10 entries)
 
     ImVector<ImFontRoundedCornerData>* TexRoundCornerData; // Data for texture-based rounded corners, indexed by radius
     ImVector<ImFontRoundedCornerData>* TexSquareCornerData; // Data for texture-based square corners, indexed by radius
