@@ -785,12 +785,12 @@ void ImDrawList::PrimQuadUV(const ImVec2& a, const ImVec2& b, const ImVec2& c, c
 #define IM_POLYLINE_TRIANGLE_BEGIN(M) ( void)(M)
 #define IM_POLYLINE_TRIANGLE_END(M)     (void)(M)
 #if IM_POLYLINE_IDX_16_BIT
-static_assert(4 * sizeof(ImDrawIdx) == sizeof(ImU64), "ImU64 must fit 4 indices");
+IM_STATIC_ASSERT(4 * sizeof(ImDrawIdx) == sizeof(ImU64)); // assumption: ImU64 must fit 4 indices
 #define IM_POLYLINE_TRIANGLE_EX(I, N, Z, A, B, C)                                              \
     *(ImU64*)I = (ImU64)((Z) + (A)) | ((ImU64)((Z) + (B)) << 16) | ((ImU64)((Z) + (C)) << 32); \
     I += 3
 #else
-static_assert(2 * sizeof(ImDrawIdx) == sizeof(ImU64), "ImU64 must fit 2 indices");
+IM_STATIC_ASSERT(2 * sizeof(ImDrawIdx) == sizeof(ImU64)); // assumption: ImU64 must fit 2 indices
 #define IM_POLYLINE_TRIANGLE_EX(I, N, Z, A, B, C)                     \
     ((ImU64*)I)[0] = (ImU64)((Z) + (A)) | ((ImU64)((Z) + (B)) << 32); \
     ((ImU64*)I)[1] = (ImU64)((Z) + (C)); \
@@ -882,7 +882,7 @@ void ImDrawList::_PolylineEmitArcs(const ImDrawListPolyline& polyline, const int
     if (arc_arm_point_count < 0 || arc_arm_point_count > 2) IM_UNLIKELY
         return;
 
-    const int max_arc_vtx_count = arc_arm_point_count * (max_arc_segment_count + 1) + 1; // 1 for the center vertex
+    const int max_arc_vtx_count = arc_arm_point_count * (max_arc_segment_count + 2) + 1; // 1 for the center vertex
     const int max_arc_idx_count = max_arc_segment_count * (1 + (arc_arm_point_count - 1) * 2) * 3;
 
     const int max_vtx_count = max_arc_vtx_count * arc_count;
@@ -2581,21 +2581,30 @@ void ImDrawList::AddPolyline(const ImVec2* points, const int points_count, ImU32
     {
         const bool round_join = polyline.join == ImDrawFlags_JoinRound;
         const bool round_cap  = polyline.cap == ImDrawFlags_CapRound;
-        const int  arc_count  =  (round_join ? points_count - (polyline.closed ? 0 : 1) : 0) + (!polyline.closed && round_cap ? 2 : 0);
+        const int  arc_count  = round_join ? (polyline.closed ? points_count : points_count - (round_cap ? 0 : 2)) : (round_cap ? 2 : 0);
 
+#define IM_POLYLINE_TEMP_BUFFER_ITEM_COUNT_SCALAR(ELEMENT_COUNT, ELEMENT_SIZE)  (((ELEMENT_COUNT) * (ELEMENT_SIZE) + 7) >> 3)
 #if defined(IMGUI_ENABLE_SSE)
-#define IM_POLYLINE_TEMP_BUFFER_ROUND_UP(count, size)  (((count) * (size) + sizeof(__m128) - 1) / sizeof(ImVec2))
+        IM_STATIC_ASSERT(sizeof(ImVec2) ==  8); // TempBuffer element size
+        IM_STATIC_ASSERT(sizeof(__m128) == 16); // SSE2 register size
+#define IM_POLYLINE_TEMP_BUFFER_ITEM_COUNT(ELEMENT_COUNT, ELEMENT_SIZE)  (((ELEMENT_COUNT) * (ELEMENT_SIZE) + 15) >> 3) // (((ELEMENT_COUNT) * (ELEMENT_SIZE) + sizeof(__m128) - 1) / sizeof(__m128)) * (sizeof(__m128) / sizeof(ImVec2))
 #else
-#define IM_POLYLINE_TEMP_BUFFER_ROUND_UP(count, size)  (count)
+#define IM_POLYLINE_TEMP_BUFFER_ITEM_COUNT(ELEMENT_COUNT, ELEMENT_SIZE)  IM_POLYLINE_TEMP_BUFFER_ITEM_COUNT_SCALAR(ELEMENT_COUNT, ELEMENT_SIZE)
 #endif
 
-        const int  normal_count             = IM_POLYLINE_TEMP_BUFFER_ROUND_UP(points_count,     sizeof(ImVec2));
-        const int  segment_length_sqr_count = IM_POLYLINE_TEMP_BUFFER_ROUND_UP(points_count + 1, sizeof(float));
+        const int  items_for_normals            = IM_POLYLINE_TEMP_BUFFER_ITEM_COUNT(points_count,     sizeof(ImVec2));
+        const int  items_for_segment_length_sqr = IM_POLYLINE_TEMP_BUFFER_ITEM_COUNT(points_count + 1, sizeof(float));
+        const int  items_for_arcs               = IM_POLYLINE_TEMP_BUFFER_ITEM_COUNT_SCALAR(arc_count, sizeof(ImDrawListPolylineArc));
 
-        this->_Data->TempBuffer.reserve_discard(normal_count + segment_length_sqr_count + arc_count * sizeof(ImDrawListPolylineArc) / 3); // 'count' normals and 'count + 1 + 1 (to round up)' segment lengths
-        ImVec2* normals             = this->_Data->TempBuffer.Data;
-        float*  segments_length_sqr = (float*)(normals + normal_count);
-        ImDrawListPolylineArc* arcs = (ImDrawListPolylineArc*)(segments_length_sqr + segment_length_sqr_count);
+        this->_Data->TempBuffer.reserve_discard(items_for_normals + items_for_segment_length_sqr + items_for_arcs);
+        ImVec2*                normals             = (               ImVec2*)(this->_Data->TempBuffer.Data);
+        float*                 segments_length_sqr = (                float*)(this->_Data->TempBuffer.Data + items_for_normals);
+        ImDrawListPolylineArc* arcs                = (ImDrawListPolylineArc*)(this->_Data->TempBuffer.Data + items_for_normals + items_for_segment_length_sqr);
+
+        IM_ASSERT_PARANOID((ImU8*)(normals)             == ((ImU8*)this->_Data->TempBuffer.Data));
+        IM_ASSERT_PARANOID((ImU8*)(segments_length_sqr) == ((ImU8*)this->_Data->TempBuffer.Data) + sizeof(ImVec2) * (items_for_normals));
+        IM_ASSERT_PARANOID((ImU8*)(arcs)                == ((ImU8*)this->_Data->TempBuffer.Data) + sizeof(ImVec2) * (items_for_normals + items_for_segment_length_sqr));
+        IM_ASSERT_PARANOID((ImU8*)(arcs + arc_count)    <= ((ImU8*)(this->_Data->TempBuffer.Data + this->_Data->TempBuffer.Capacity)));
 
         const int segment_count = points_count - 1;
 
