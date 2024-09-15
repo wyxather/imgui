@@ -763,7 +763,12 @@ void ImDrawList::PrimQuadUV(const ImVec2& a, const ImVec2& b, const ImVec2& c, c
 
 #define IM_POLYLINE_PRIM_SPLT()                         IM_POLYLINE_PRIM_COMMIT(); this->PrimReserve(unused_idx_count, unused_vtx_count); IM_POLYLINE_PRIM_LOAD_LOCAL()
 
-#define IM_POLYLINE_VTX_COMMIT(N)                       { IM_POLYLINE_PRIM_VTX_WRITE += N; IM_POLYLINE_PRIM_IDX_BASE += N; }
+#define IM_POLYLINE_VTX_COMMIT(N)                                                                                \
+    {                                                                                                            \
+        IM_ASSERT_PARANOID((IM_POLYLINE_PRIM_VTX_WRITE + (N)) <= (this->VtxBuffer.Data + this->VtxBuffer.Size) && "IM_POLYLINE_VTX_COMMIT: VtxWritePtr moved out of bounds!"); \
+        IM_POLYLINE_PRIM_VTX_WRITE += N;                                                                         \
+        IM_POLYLINE_PRIM_IDX_BASE += N;                                                                          \
+    }
 
 #if IM_POLYLINE_IDX_16_BIT
 #define IM_POLYLINE_PRIM_HANDLE_VTX_OFFSET_OVERFLOW(NEXT_BATCH_VTX_COUNT) if (sizeof(ImDrawIdx) == 2 && ((IM_POLYLINE_PRIM_IDX_BASE) + (NEXT_BATCH_VTX_COUNT) >= (1 << 16)) && (Flags & ImDrawListFlags_AllowVtxOffset)) IM_UNLIKELY { IM_POLYLINE_PRIM_SPLT(); }
@@ -774,6 +779,7 @@ void ImDrawList::PrimQuadUV(const ImVec2& a, const ImVec2& b, const ImVec2& c, c
 // Macros for filling vertices
 #define IM_POLYLINE_VERTEX(N, X, Y, UV, C)        \
     {                                             \
+        IM_ASSERT_PARANOID((IM_POLYLINE_PRIM_VTX_WRITE + (N)) < (this->VtxBuffer.Data + this->VtxBuffer.Size) && "IM_POLYLINE_VERTEX: Writing outside of allocated buffer!"); \
         IM_POLYLINE_PRIM_VTX_WRITE[N].pos.x = X;  \
         IM_POLYLINE_PRIM_VTX_WRITE[N].pos.y = Y;  \
         IM_POLYLINE_PRIM_VTX_WRITE[N].uv    = UV; \
@@ -2112,7 +2118,7 @@ void ImDrawList::_PolylineAliased(const ImDrawListPolyline& polyline)
     // Reserve vertices and indices for worst case scenario
     // Unused vertices and indices will be released after the loop
     const ImVec2 uv        = this->_Data->TexUvWhitePixel;
-    const int    vtx_count = (polyline.point_count * 7 + 2);      // top 7 vertices per join, 2 for butt cap
+    const int    vtx_count = (polyline.point_count * 7 + 2);     // top 7 vertices per join, 2 for butt cap
     const int    idx_count = (polyline.point_count * 5) * 3 + 1; // top 5 triangles per join, 1 index to avoid write in non-reserved memory
 
     IM_POLYLINE_PRIM_RESERVE(idx_count, vtx_count);
@@ -2555,7 +2561,7 @@ void ImDrawList::_PolylineAliased(const ImDrawListPolyline& polyline)
         IM_POLYLINE_ALIASED_EMIT_CAP(-1.0f);
     }
 
-    IM_POLYLINE_VTX_COMMIT(3);
+    IM_POLYLINE_VTX_COMMIT(2);
 
     IM_POLYLINE_PRIM_COMMIT();
 
