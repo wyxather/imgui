@@ -742,7 +742,7 @@ void ImDrawList::PrimQuadUV(const ImVec2& a, const ImVec2& b, const ImVec2& c, c
 
 #define IM_POLYLINE_PRIM_MAKE_LOCAL()   ImDrawVert*  IM_POLYLINE_PRIM_VTX_WRITE = this->_VtxWritePtr;         ImDrawIdx*   IM_POLYLINE_PRIM_IDX_WRITE = this->_IdxWritePtr;   unsigned int IM_POLYLINE_PRIM_IDX_BASE  = this->_VtxCurrentIdx
 #define IM_POLYLINE_PRIM_LOAD_LOCAL()                IM_POLYLINE_PRIM_VTX_WRITE = this->_VtxWritePtr;                      IM_POLYLINE_PRIM_IDX_WRITE = this->_IdxWritePtr;                IM_POLYLINE_PRIM_IDX_BASE  = this->_VtxCurrentIdx
-#define IM_POLYLINE_PRIM_SAVE_LOCAL()                this->_VtxWritePtr         = IM_POLYLINE_PRIM_VTX_WRITE;              this->_IdxWritePtr   = IM_POLYLINE_PRIM_IDX_WRITE;              this->_VtxCurrentIdx = IM_POLYLINE_PRIM_IDX_BASE 
+#define IM_POLYLINE_PRIM_SAVE_LOCAL()                this->_VtxWritePtr         = IM_POLYLINE_PRIM_VTX_WRITE;              this->_IdxWritePtr   = IM_POLYLINE_PRIM_IDX_WRITE;              this->_VtxCurrentIdx = IM_POLYLINE_PRIM_IDX_BASE
 #else
 #define IM_POLYLINE_PRIM_VTX_WRITE      this->_VtxWritePtr
 #define IM_POLYLINE_PRIM_IDX_WRITE      this->_IdxWritePtr
@@ -1275,79 +1275,79 @@ void ImDrawList::_PolylineThinAntiAliased(const ImDrawListPolyline& polyline)
             if (preferred_join == Miter) IM_LIKELY
             {
                 if (cos_theta > IM_POLYLINE_MITER_ANGLE_LIMIT) IM_LIKELY
-            {
-                // Fill gap between segments with Miter join
-                //
-                // Left Miter join:        Right Miter join:
-                //
-                //            ,          |              ,
-                //       6  .'    ~      |          ~    '.  8
-                //    5'  .+.            |                .+.  '5
-                //      +:.  '.     .'   |       '.     .'  .:+
-                //      |  ''..:. .'     |         '. .:..''  |
-                //      +--------+-- ~   |       ~ --+--------+
-                //     3|       7|       |           |7       |4
-                //
-
-                if (sin_theta < 0.0f)
                 {
-                    IM_POLYLINE_VERTEX(5, p1.x - miter_offset_x, p1.y - miter_offset_y, uv, polyline.fringe_color);
+                    // Fill gap between segments with Miter join
+                    //
+                    // Left Miter join:        Right Miter join:
+                    //
+                    //            ,          |              ,
+                    //       6  .'    ~      |          ~    '.  8
+                    //    5'  .+.            |                .+.  '5
+                    //      +:.  '.     .'   |       '.     .'  .:+
+                    //      |  ''..:. .'     |         '. .:..''  |
+                    //      +--------+-- ~   |       ~ --+--------+
+                    //     3|       7|       |           |7       |4
+                    //
 
-                    IM_POLYLINE_TRIANGLE_BEGIN(6);
-                    IM_POLYLINE_TRIANGLE(0, 3, 7, 5);
-                    IM_POLYLINE_TRIANGLE(1, 5, 7, 6);
-                    IM_POLYLINE_TRIANGLE_END(6);
-                }
-                else
-                {
-                    IM_POLYLINE_VERTEX(5, p1.x + miter_offset_x, p1.y + miter_offset_y, uv, polyline.fringe_color);
+                    if (sin_theta < 0.0f)
+                    {
+                        IM_POLYLINE_VERTEX(5, p1.x - miter_offset_x, p1.y - miter_offset_y, uv, polyline.fringe_color);
 
-                    IM_POLYLINE_TRIANGLE_BEGIN(6);
-                    IM_POLYLINE_TRIANGLE(0, 4, 5, 7);
-                    IM_POLYLINE_TRIANGLE(1, 5, 8, 7);
-                    IM_POLYLINE_TRIANGLE_END(6);
+                        IM_POLYLINE_TRIANGLE_BEGIN(6);
+                        IM_POLYLINE_TRIANGLE(0, 3, 7, 5);
+                        IM_POLYLINE_TRIANGLE(1, 5, 7, 6);
+                        IM_POLYLINE_TRIANGLE_END(6);
+                    }
+                    else
+                    {
+                        IM_POLYLINE_VERTEX(5, p1.x + miter_offset_x, p1.y + miter_offset_y, uv, polyline.fringe_color);
+
+                        IM_POLYLINE_TRIANGLE_BEGIN(6);
+                        IM_POLYLINE_TRIANGLE(0, 4, 5, 7);
+                        IM_POLYLINE_TRIANGLE(1, 5, 8, 7);
+                        IM_POLYLINE_TRIANGLE_END(6);
                     }
                 }
             }
             else if (preferred_join == Bevel) IM_UNLIKELY
             {
                 if (cos_theta > IM_POLYLINE_MITER_ANGLE_LIMIT) IM_LIKELY
-            {
-                // Fill gap between segments with Bevel join
-                //
-                // Left Bevel join:       Right Bevel join:
-                //
-                //            ,          |             ,
-                //       6  .'    ~      |         ~    '.  8
-                //         +.            |               .+
-                //        '  '.     .'   |      '.     .'  '
-                //       '     '. .'     |        '. .'     '
-                //      +--------+-- ~   |      ~ --+--------+
-                //     3|       7|       |          |7       |4
-                //
-
-                float bevel_normal_x, bevel_normal_y;
-                IM_POLYLINE_BEVEL_NORMAL(bevel_normal_x, bevel_normal_y);
-
-                float dir_0_x, dir_0_y, dir_1_x, dir_1_y;
-                IM_POLYLINE_BEVEL_VECTORS(bevel_normal_x, bevel_normal_y, dir_0_x, dir_0_y, dir_1_x, dir_1_y, half_thickness);
-
-                if (sin_theta < 0.0f)
                 {
-                    IM_POLYLINE_VERTEX(3, p1.x - dir_0_x, p1.y - dir_0_y, uv, polyline.fringe_color);
-                    IM_POLYLINE_VERTEX(6, p1.x - dir_1_x, p1.y - dir_1_y, uv, polyline.fringe_color);
+                    // Fill gap between segments with Bevel join
+                    //
+                    // Left Bevel join:       Right Bevel join:
+                    //
+                    //            ,          |             ,
+                    //       6  .'    ~      |         ~    '.  8
+                    //         +.            |               .+
+                    //        '  '.     .'   |      '.     .'  '
+                    //       '     '. .'     |        '. .'     '
+                    //      +--------+-- ~   |      ~ --+--------+
+                    //     3|       7|       |          |7       |4
+                    //
 
-                    IM_POLYLINE_TRIANGLE_BEGIN(3);
-                    IM_POLYLINE_TRIANGLE(0, 3, 7, 6);
-                    IM_POLYLINE_TRIANGLE_END(3);
-                }
-                else
-                {
-                    IM_POLYLINE_VERTEX(4, p1.x + dir_0_x, p1.y + dir_0_y, uv, polyline.fringe_color);
-                    IM_POLYLINE_VERTEX(8, p1.x + dir_1_x, p1.y + dir_1_y, uv, polyline.fringe_color);
+                    float bevel_normal_x, bevel_normal_y;
+                    IM_POLYLINE_BEVEL_NORMAL(bevel_normal_x, bevel_normal_y);
 
-                    IM_POLYLINE_TRIANGLE_BEGIN(3);
-                    IM_POLYLINE_TRIANGLE(1, 7, 4, 8);
+                    float dir_0_x, dir_0_y, dir_1_x, dir_1_y;
+                    IM_POLYLINE_BEVEL_VECTORS(bevel_normal_x, bevel_normal_y, dir_0_x, dir_0_y, dir_1_x, dir_1_y, half_thickness);
+
+                    if (sin_theta < 0.0f)
+                    {
+                        IM_POLYLINE_VERTEX(3, p1.x - dir_0_x, p1.y - dir_0_y, uv, polyline.fringe_color);
+                        IM_POLYLINE_VERTEX(6, p1.x - dir_1_x, p1.y - dir_1_y, uv, polyline.fringe_color);
+
+                        IM_POLYLINE_TRIANGLE_BEGIN(3);
+                        IM_POLYLINE_TRIANGLE(0, 3, 7, 6);
+                        IM_POLYLINE_TRIANGLE_END(3);
+                    }
+                    else
+                    {
+                        IM_POLYLINE_VERTEX(4, p1.x + dir_0_x, p1.y + dir_0_y, uv, polyline.fringe_color);
+                        IM_POLYLINE_VERTEX(8, p1.x + dir_1_x, p1.y + dir_1_y, uv, polyline.fringe_color);
+
+                        IM_POLYLINE_TRIANGLE_BEGIN(3);
+                        IM_POLYLINE_TRIANGLE(1, 7, 4, 8);
                         IM_POLYLINE_TRIANGLE_END(3);
                     }
                 }
@@ -2719,7 +2719,7 @@ void ImDrawList::AddPolyline(const ImVec2* points, const int points_count, ImU32
             polyline.fringe_thickness = polyline.thickness + fringe_width * 2.0f;
         }
 
-        if (polyline.thickness <= 0.0f) IM_LIKELY 
+        if (polyline.thickness <= 0.0f) IM_LIKELY
             this->_PolylineThinAntiAliased(polyline);
         else
             this->_PolylineThickAntiAliased(polyline);
@@ -3426,7 +3426,7 @@ void ImDrawList::AddLine(const ImVec2& p1, const ImVec2& p2, ImU32 col, float th
 // Note we don't render 1 pixels sized rectangles properly.
 void ImDrawList::AddRect(const ImVec2& p_min, const ImVec2& p_max, ImU32 col, float rounding, ImDrawFlags flags, float thickness)
 {
-    if ((col & IM_COL32_A_MASK) == 0)
+    if ((col & IM_COL32_A_MASK) == 0 || thickness <= 0.0f) IM_UNLIKELY
         return;
 
 if (GImGui->IO.KeyCtrl || (flags & 0x80000000u))
@@ -3472,8 +3472,8 @@ if (GImGui->IO.KeyCtrl || (flags & 0x80000000u))
     if (rounding >= 0.5f)
     {
         flags = FixRectCornerFlags(flags);
-        rounding = ImMin(rounding, ImFabs(b.x - a.x - half_outer_thickness) * (((flags & ImDrawFlags_RoundCornersTop) == ImDrawFlags_RoundCornersTop) || ((flags & ImDrawFlags_RoundCornersBottom) == ImDrawFlags_RoundCornersBottom) ? 0.5f : 1.0f) - 1.0f);
-        rounding = ImMin(rounding, ImFabs(b.y - a.y - half_outer_thickness) * (((flags & ImDrawFlags_RoundCornersLeft) == ImDrawFlags_RoundCornersLeft) || ((flags & ImDrawFlags_RoundCornersRight) == ImDrawFlags_RoundCornersRight) ? 0.5f : 1.0f) - 1.0f);
+        rounding = ImMin(rounding, ImFabs(b.x - a.x) * (((flags & ImDrawFlags_RoundCornersTop) == ImDrawFlags_RoundCornersTop) || ((flags & ImDrawFlags_RoundCornersBottom) == ImDrawFlags_RoundCornersBottom) ? 0.5f : 1.0f) - 1.0f);
+        rounding = ImMin(rounding, ImFabs(b.y - a.y) * (((flags & ImDrawFlags_RoundCornersLeft) == ImDrawFlags_RoundCornersLeft) || ((flags & ImDrawFlags_RoundCornersRight) == ImDrawFlags_RoundCornersRight) ? 0.5f : 1.0f) - 1.0f);
     }
     if (rounding < 0.5f || (flags & ImDrawFlags_RoundCornersMask_) == ImDrawFlags_RoundCornersNone)
     {
@@ -3494,8 +3494,8 @@ if (GImGui->IO.KeyCtrl || (flags & 0x80000000u))
     }
     else
     {
-        const int arc_step = ImMax(1, IM_DRAWLIST_ARCFAST_SAMPLE_MAX / _CalcCircleAutoSegmentCount(rounding));
-        const float arc_offset_correction = 0.207107f * _FringeScale; // sqrt(2)/4
+        const int arc_step = ImMax(1, IM_DRAWLIST_ARCFAST_SAMPLE_MAX / _CalcCircleAutoSegmentCount(rounding + half_outer_thickness));
+        const float arc_offset_correction = 0.207107f * _FringeScale; // sqrt(2)/2
 
 #define IM_ADDRECT_EMIT_ARC(P, R, A_MIN, A_MAX) _PathArcToFastEx(P, R, (A_MIN) * IM_DRAWLIST_ARCFAST_SAMPLE_MAX / 12, (A_MAX) * IM_DRAWLIST_ARCFAST_SAMPLE_MAX / 12, arc_step)
 #define IM_ADDRECT_EMIT_ROUNDED_PATH(AX, AY, BX, BY, ROUNDING)                                                                                                                                             \
