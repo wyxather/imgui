@@ -3428,11 +3428,137 @@ void ImDrawList::AddRect(const ImVec2& p_min, const ImVec2& p_max, ImU32 col, fl
 {
     if ((col & IM_COL32_A_MASK) == 0)
         return;
+
+if (GImGui->IO.KeyCtrl || (flags & 0x80000000u))
+{
+    ImU32 inner_color  = 0;
+    ImU32 outer_color  = col;
+    float inner_thickness = 0.0f;
+    float outer_thickness = thickness;
+    int strip_count = 1;
+    int strip_size = 0;
+    if (this->Flags & ImDrawListFlags_AntiAliasedLines) IM_LIKELY
+    {
+        inner_color = col;
+        outer_color = col & ~IM_COL32_A_MASK;
+
+        if (thickness > this->_FringeScale) IM_LIKELY
+        {
+            strip_count     = 3;
+            inner_thickness = thickness - this->_FringeScale;
+            outer_thickness = thickness + this->_FringeScale;
+        }
+        else if (thickness < this->_FringeScale) IM_UNLIKELY
+        {
+            // Blend color alpha using fringe
+            const ImU32 alpha = (ImU32)(((col >> IM_COL32_A_SHIFT) & 0xFF) * (thickness / this->_FringeScale));
+            if (alpha == 0)
+                return;
+
+            strip_count     = 2;
+            inner_color     = outer_color | (alpha << IM_COL32_A_SHIFT);
+            outer_thickness = this->_FringeScale;
+        }
+        else IM_LIKELY
+        {
+            strip_count = 2;
+        }
+    }
+
+    const float half_inner_thickness = 0.5f * inner_thickness;
+    const float half_outer_thickness = 0.5f * outer_thickness;
+
+    const ImVec2 uv = this->_Data->TexUvWhitePixel;
+
+    const ImVec2 a = p_min + ImVec2(0.50f, 0.50f);
+    const ImVec2 b = p_max - ImVec2(0.50f, 0.50f);
+
+    if (rounding >= 0.5f)
+    {
+        flags = FixRectCornerFlags(flags);
+        rounding = ImMin(rounding, ImFabs(b.x - a.x - half_outer_thickness) * (((flags & ImDrawFlags_RoundCornersTop) == ImDrawFlags_RoundCornersTop) || ((flags & ImDrawFlags_RoundCornersBottom) == ImDrawFlags_RoundCornersBottom) ? 0.5f : 1.0f) - 1.0f);
+        rounding = ImMin(rounding, ImFabs(b.y - a.y - half_outer_thickness) * (((flags & ImDrawFlags_RoundCornersLeft) == ImDrawFlags_RoundCornersLeft) || ((flags & ImDrawFlags_RoundCornersRight) == ImDrawFlags_RoundCornersRight) ? 0.5f : 1.0f) - 1.0f);
+    }
+    if (rounding < 0.5f || (flags & ImDrawFlags_RoundCornersMask_) == ImDrawFlags_RoundCornersNone)
+    {
+        strip_size = 4;
+
+        IM_POLYLINE_PRIM_RESERVE(24 * strip_count, 4 * (strip_count + 1));
+
+#define IM_ADDRECT_EMIT_STRIP_VERTICES(AX, AY, BX, BY, C) { IM_POLYLINE_VERTEX(0, AX, AY, uv, C); IM_POLYLINE_VERTEX(1, BX, AY, uv, C); IM_POLYLINE_VERTEX(2, BX, BY, uv, C); IM_POLYLINE_VERTEX(3, AX, BY, uv, C); IM_POLYLINE_PRIM_VTX_WRITE += 4; }
+
+                                          IM_ADDRECT_EMIT_STRIP_VERTICES(a.x - half_outer_thickness, a.y - half_outer_thickness, b.x + half_outer_thickness, b.y + half_outer_thickness, outer_color);
+        if (strip_count >  1) IM_LIKELY   IM_ADDRECT_EMIT_STRIP_VERTICES(a.x - half_inner_thickness, a.y - half_inner_thickness, b.x + half_inner_thickness, b.y + half_inner_thickness, inner_color);
+        if (strip_count == 3) IM_UNLIKELY IM_ADDRECT_EMIT_STRIP_VERTICES(a.x + half_inner_thickness, a.y + half_inner_thickness, b.x - half_inner_thickness, b.y - half_inner_thickness, inner_color);
+                                          IM_ADDRECT_EMIT_STRIP_VERTICES(a.x + half_outer_thickness, a.y + half_outer_thickness, b.x - half_outer_thickness, b.y - half_outer_thickness, outer_color);
+
+#undef IM_ADDRECT_EMIT_STRIP_VERTICES
+    }
+    else
+    {
+        const int arc_step = ImMax(1, IM_DRAWLIST_ARCFAST_SAMPLE_MAX / _CalcCircleAutoSegmentCount(rounding));
+
+#define IM_ADDRECT_EMIT_ARC(P, R, A_MIN, A_MAX) _PathArcToFastEx(P, R, (A_MIN) * IM_DRAWLIST_ARCFAST_SAMPLE_MAX / 12, (A_MAX) * IM_DRAWLIST_ARCFAST_SAMPLE_MAX / 12, arc_step)
+#define IM_ADDRECT_EMIT_ROUNDED_PATH(AX, AY, BX, BY, ROUNDING)                                                                                             \
+        {                                                                                                                                                  \
+            const float r = ImMax(ROUNDING, 0.5f);                                                                                                         \
+            if ((flags & ImDrawFlags_RoundCornersTopLeft))     IM_ADDRECT_EMIT_ARC(ImVec2((AX) + r, (AY) + r), r, 6,  9); else PathLineTo(ImVec2(AX, AY)); \
+            if ((flags & ImDrawFlags_RoundCornersTopRight))    IM_ADDRECT_EMIT_ARC(ImVec2((BX) - r, (AY) + r), r, 9, 12); else PathLineTo(ImVec2(BX, AY)); \
+            if ((flags & ImDrawFlags_RoundCornersBottomRight)) IM_ADDRECT_EMIT_ARC(ImVec2((BX) - r, (BY) - r), r, 0,  3); else PathLineTo(ImVec2(BX, BY)); \
+            if ((flags & ImDrawFlags_RoundCornersBottomLeft))  IM_ADDRECT_EMIT_ARC(ImVec2((AX) + r, (BY) - r), r, 3,  6); else PathLineTo(ImVec2(AX, BY)); \
+        }
+#define IM_ADDRECT_PATH_TO_VERTICES(C)                                        \
+        for (int i = 0; i < this->_Path.Size; i++)                            \
+            IM_POLYLINE_VERTEX(i, this->_Path[i].x, this->_Path[i].y, uv, C); \
+        IM_POLYLINE_PRIM_VTX_WRITE += this->_Path.Size;                       \
+        this->_Path.Size = 0
+#define IM_ADDRECT_EMIT_ROUNDED_VERTICES(AX, AY, BX, BY, ROUNDING, C) { IM_ADDRECT_EMIT_ROUNDED_PATH(AX, AY, BX, BY, ROUNDING); IM_ADDRECT_PATH_TO_VERTICES(C); }
+
+        IM_ADDRECT_EMIT_ROUNDED_PATH(a.x - half_outer_thickness, a.y - half_outer_thickness, b.x + half_outer_thickness, b.y + half_outer_thickness, rounding + half_outer_thickness);
+        strip_size = this->_Path.Size;
+        IM_POLYLINE_PRIM_RESERVE(strip_size * strip_count * 6, strip_size * (strip_count + 1));
+        IM_ADDRECT_PATH_TO_VERTICES(outer_color);
+
+        if (strip_count >  1) IM_LIKELY   IM_ADDRECT_EMIT_ROUNDED_VERTICES(a.x - half_inner_thickness, a.y - half_inner_thickness, b.x + half_inner_thickness, b.y + half_inner_thickness, rounding + half_inner_thickness, inner_color);
+        if (strip_count == 3) IM_UNLIKELY IM_ADDRECT_EMIT_ROUNDED_VERTICES(a.x + half_inner_thickness, a.y + half_inner_thickness, b.x - half_inner_thickness, b.y - half_inner_thickness, rounding - half_inner_thickness, inner_color);
+                                          IM_ADDRECT_EMIT_ROUNDED_VERTICES(a.x + half_outer_thickness, a.y + half_outer_thickness, b.x - half_outer_thickness, b.y - half_outer_thickness, rounding - half_outer_thickness, outer_color);
+
+#undef IM_ADDRECT_EMIT_ARC
+#undef IM_ADDRECT_EMIT_ROUNDED_PATH
+#undef IM_ADDRECT_PATH_TO_VERTICES
+#undef IM_ADDRECT_EMIT_ROUNDED_VERTICES
+    }
+
+    IM_POLYLINE_PRIM_MAKE_LOCAL();
+
+    for (int i = 0; i < strip_count; ++i)
+    {
+        IM_POLYLINE_TRIANGLE_BEGIN(strip_size * 6);
+        for (int j = 0; j < strip_size - 1; ++j)
+        {
+            IM_POLYLINE_TRIANGLE(j * 2 + 0, j, j + 1 + strip_size, j + 1);
+            IM_POLYLINE_TRIANGLE(j * 2 + 1, j, j + strip_size, j + 1 + strip_size);
+        }
+        IM_POLYLINE_TRIANGLE(strip_size * 2 - 2, strip_size - 1, strip_size, 0);
+        IM_POLYLINE_TRIANGLE(strip_size * 2 - 1, strip_size - 1, strip_size * 2 - 1, strip_size);
+        IM_POLYLINE_TRIANGLE_END(strip_size * 6);
+
+        IM_POLYLINE_VTX_COMMIT(strip_size);
+    }
+
+    IM_POLYLINE_VTX_COMMIT(strip_size);
+
+    IM_POLYLINE_PRIM_COMMIT();
+}
+else
+{
+
     if (Flags & ImDrawListFlags_AntiAliasedLines)
         PathRect(p_min + ImVec2(0.50f, 0.50f), p_max - ImVec2(0.50f, 0.50f), rounding, flags);
     else
         PathRect(p_min + ImVec2(0.50f, 0.50f), p_max - ImVec2(0.49f, 0.49f), rounding, flags); // Better looking lower-right corner and rounded non-AA shapes.
     PathStroke(col, ImDrawFlags_Closed, thickness);
+}
 }
 
 void ImDrawList::AddRectFilled(const ImVec2& p_min, const ImVec2& p_max, ImU32 col, float rounding, ImDrawFlags flags)
