@@ -20,6 +20,8 @@ Index of this file:
 
 namespace ImGui
 {
+    IMGUI_API void CreateStackLayoutStates();
+    IMGUI_API void DestroyStackLayoutStates();
     IMGUI_API void BeginHorizontal(const char* str_id, const ImVec2& size = ImVec2(0, 0), float align = -1.0f);
     IMGUI_API void BeginHorizontal(const void* ptr_id, const ImVec2& size = ImVec2(0, 0), float align = -1.0f);
     IMGUI_API void BeginHorizontal(int id, const ImVec2& size = ImVec2(0, 0), float align = -1);
