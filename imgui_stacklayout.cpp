@@ -1138,22 +1138,16 @@ void ImGui::DestroyStackLayoutStates()
     IM_DELETE(GStackLayoutStates);
 }
 
-void ImGui::BeginHorizontal(const char* str_id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
+void ImGui::BeginHorizontal(ImStrv str_id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
 {
     ImGuiWindow* window = GetCurrentWindow();
     BeginLayout(window->GetID(str_id), ImGuiLayoutType_Horizontal, size, align);
 }
 
-void ImGui::BeginHorizontal(const void* ptr_id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
+void ImGui::BeginHorizontal(ImGuiID id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
 {
     ImGuiWindow* window = GetCurrentWindow();
-    BeginLayout(window->GetID(ptr_id), ImGuiLayoutType_Horizontal, size, align);
-}
-
-void ImGui::BeginHorizontal(int id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
-{
-    ImGuiWindow* window = GetCurrentWindow();
-    BeginLayout(window->GetID((void*)(intptr_t)id), ImGuiLayoutType_Horizontal, size, align);
+    BeginLayout(id, ImGuiLayoutType_Horizontal, size, align);
 }
 
 void ImGui::EndHorizontal()
@@ -1161,22 +1155,16 @@ void ImGui::EndHorizontal()
     EndLayout(ImGuiLayoutType_Horizontal);
 }
 
-void ImGui::BeginVertical(const char* str_id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
+void ImGui::BeginVertical(ImStrv str_id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
 {
     ImGuiWindow* window = GetCurrentWindow();
     BeginLayout(window->GetID(str_id), ImGuiLayoutType_Vertical, size, align);
 }
 
-void ImGui::BeginVertical(const void* ptr_id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
+void ImGui::BeginVertical(ImGuiID id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
 {
     ImGuiWindow* window = GetCurrentWindow();
-    BeginLayout(window->GetID(ptr_id), ImGuiLayoutType_Vertical, size, align);
-}
-
-void ImGui::BeginVertical(int id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
-{
-    ImGuiWindow* window = GetCurrentWindow();
-    BeginLayout(window->GetID((void*)(intptr_t)id), ImGuiLayoutType_Vertical, size, align);
+    BeginLayout(id, ImGuiLayoutType_Vertical, size, align);
 }
 
 void ImGui::EndVertical()
