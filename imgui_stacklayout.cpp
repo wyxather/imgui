@@ -189,7 +189,7 @@ struct ImGuiLayoutState
 // [SECTION] Stack Layout: Context forward declarations
 //-----------------------------------------------------------------------------
 
-static ImGuiStorage GStackLayoutStates;
+static ImGuiStorage* GStackLayoutStates;
 
 // Context management/hooks
 static ImGuiID                  GetContextID(ImGuiContext* context); // FIXME: ImGuiContext probably should have their own ID assigned
@@ -262,7 +262,7 @@ static ImGuiLayoutState* GetLayoutState(ImGuiContext* context)
 
     ImGuiID context_id = GetContextID(context);
 
-    ImGuiLayoutState* state = (ImGuiLayoutState*)GStackLayoutStates.GetVoidPtr(context_id);
+    ImGuiLayoutState* state = (ImGuiLayoutState*)GStackLayoutStates->GetVoidPtr(context_id);
     if (state == NULL)
         state = CreateLayoutState(context_id, context);
 
@@ -293,7 +293,7 @@ static ImGuiLayoutState* CreateLayoutState(ImGuiID context_id, ImGuiContext* con
     shutdown_hook.Callback = StackLayout_ShutdownCallback;
     state->ShutdownHookID = ImGui::AddContextHook(context, &shutdown_hook);
 
-    GStackLayoutStates.SetVoidPtr(context_id, state);
+    GStackLayoutStates->SetVoidPtr(context_id, state);
 
     return state;
 }
@@ -335,7 +335,7 @@ static void StackLayout_ShutdownCallback(ImGuiContext* ctx, ImGuiContextHook* ho
         IM_DELETE(layout_window_state);
     }
 
-    GStackLayoutStates.SetVoidPtr(layout_state->ContextID, nullptr);
+    GStackLayoutStates->SetVoidPtr(layout_state->ContextID, nullptr);
 
     IM_DELETE(layout_state);
 }
@@ -1127,6 +1127,16 @@ void ImGuiInternal::UpdateItemRect(ImGuiID window_id, const ImVec2& min, const I
 //-----------------------------------------------------------------------------
 // [SECTION] Stack Layout: Public API
 //-----------------------------------------------------------------------------
+
+void ImGui::CreateStackLayoutStates()
+{
+    GStackLayoutStates = IM_NEW(ImGuiStorage)();
+}
+
+void ImGui::DestroyStackLayoutStates()
+{
+    IM_DELETE(GStackLayoutStates);
+}
 
 void ImGui::BeginHorizontal(const char* str_id, const ImVec2& size/* = ImVec2(0, 0)*/, float align/* = -1*/)
 {
