@@ -443,7 +443,7 @@ static void ImGui::BeginLayout(ImGuiID id, ImGuiLayoutType type, ImVec2 size, fl
 {
     ImGuiWindow* window = GetCurrentWindow();
 
-    PushID(id);
+    PushOverrideID(id);
 
     // Find or create
     ImGuiLayout* layout = FindLayout(id, type);
